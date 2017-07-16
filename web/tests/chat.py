@@ -27,6 +27,7 @@ if __name__ == '__main__':
     main(sys.argv)
 import setup
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import ElementNotVisibleException
 
 driver = setup.MakeDriver()
 driver.WaitForGameLoaded()
@@ -41,14 +42,8 @@ playerNames = {
     }
 
 def testChat(player, chatName, shouldBeMember):
-
   driver.SwitchUser(player)
   
-  try:
-   driver.Click([[By.NAME, 'close-notification']])
-  except AssertionError:
-    pass # This user didn't have a notification
-
   if shouldBeMember:
     driver.DrawerMenuClick('mobile-main-page', 'Chat')
     driver.Click([[By.NAME, 'chat-card'], [By.NAME, chatName]]) # aaah, crashed here too on mobile
@@ -89,6 +84,11 @@ def testChat(player, chatName, shouldBeMember):
     driver.ExpectContains([[By.TAG_NAME, 'ghvz-chat-room-list']], chatName, should_exist=False)
     driver.DrawerMenuClick('chat-card', 'Dashboard')
 
+
+driver.SwitchUser('jack')
+driver.Click([[By.NAME, 'close-notification']])
+
+
 # GLOBAL CHAT ROOM - all types of joined players + admins should view.
 testChat('jack', 'Global Chat', True) # Human
 testChat('zeke', 'Global Chat', True) # Zombie
@@ -106,5 +106,3 @@ testChat('zeke', 'Resistance Comms Hub', False) # Zombie
 testChat('deckerd', 'Resistance Comms Hub', False) # Undeclared
 
 driver.Quit()
-
-

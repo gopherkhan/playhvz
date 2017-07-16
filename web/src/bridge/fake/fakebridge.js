@@ -38,6 +38,7 @@ class FakeBridge {
               console.error(error);
               console.error(arguments);
               alertHandler(error)
+              throw error;
             });
     }
   }
@@ -51,9 +52,17 @@ class FakeBridge {
       setTimeout(resolve, 0);
     });
   }
-  getSignedInPromise({userId}) {
+  getSignedInPromise({userId, email}) {
     assert(userId);
-    return this.server.register({userId: userId}).then(() => userId);
+    return new Promise((resolve, reject) => {
+      this.server.register({userId: userId})
+          .then(
+              () => {
+                //TODO(verdagon): somehow retrieve the fake user's email here
+                resolve({userId: userId, email: "emailhere@somewebsite.lol"})
+              }, 
+              reject);
+    });
   }
   listenToGame(userId, gameId, destination) {
     var gatedWriter = new GatedWriter(new MappingWriter(destination), false);
@@ -73,11 +82,17 @@ class FakeBridge {
           gatedWriter.closeGate();
         }, 100);
 
-    return new Promise ((resolve, reject) => {
+    let foundGamePromise = new Promise((resolve, reject) => {
+      setTimeout(() => {
+        resolve();
+      }, 1000);
+    });
+    let finishedLoadingGamePromise = new Promise ((resolve, reject) => {
       setTimeout(() => {
         resolve();        
       }, 2000);
     });
+    return [foundGamePromise, finishedLoadingGamePromise];
   }
 }
 

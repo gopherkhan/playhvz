@@ -57,7 +57,7 @@ class SimpleDriver:
     return element
 
   def Click(self, path):
-    element = self.FindElement(path)
+    element = self.FindElement(path, check_visible=False)
     assert element.is_enabled(), "Element %s isn't enabled" % path
     element.click()
 
@@ -77,7 +77,7 @@ class SimpleDriver:
       assert(textToLookFor == someAlert.text)
     someAlert.accept();
 
-  def ExpectAttributeEqual(self, path, attribute_name, value):
+  def ExpectAttributeEqual(self, path, attribute_name, value, wait_long=False):
     element = self.FindElement(path)
     assert(element is not None)
     attribute_value = element.get_attribute(attribute_name)
@@ -122,7 +122,7 @@ class RetryingDriver:
       wait_long=wait_long)
 
   def Click(self, path):
-    return self.Retry(lambda: self.inner_driver.Click(path))
+    return self.Retry(lambda: self.inner_driver.Click(path), wait_long=False)
 
   def DismissAlert(self, textToLookFor = ''):
     return self.Retry(lambda: self.inner_driver.DismissAlert(textToLookFor))
@@ -139,8 +139,8 @@ class RetryingDriver:
   def ExpectContains(self, path, needle, should_exist=True, check_visible=True):
     return self.Retry(lambda: self.inner_driver.ExpectContains(path, needle, should_exist=should_exist, check_visible=check_visible))
 
-  def ExpectAttributeEqual(self, path, attribute_name, value):
-    return self.Retry(lambda: self.inner_driver.ExpectAttributeEqual(path, attribute_name, value))
+  def ExpectAttributeEqual(self, path, attribute_name, value, wait_long=False):
+    return self.Retry(lambda: self.inner_driver.ExpectAttributeEqual(path, attribute_name, value), wait_long=wait_long)
 
   def Quit(self):
     self.inner_driver.Quit()
@@ -148,7 +148,7 @@ class RetryingDriver:
   def Retry(self, callback, wait_long=False):
     sleep_durations = [.5, .5, .5, .5, 1, 1]
     if wait_long:
-      sleep_durations = [1, 1, 1, 1, 1, 1, 2, 4, 8, 16]
+      sleep_durations = [1, 1, 1, 1, 1, 1, 2, 4, 8, 16, 32, 64]
     for i in range(0, len(sleep_durations) + 1):
       try:
         return callback()
@@ -210,8 +210,8 @@ class RemoteDriver:
     self.current_user = user
     self.drivers_by_user[user] = retrying_driver
 
-    self.FindElement([[By.ID, 'root']], wait_long=True)
-    self.ExpectAttributeEqual([[By.ID, 'realApp']], 'signed-in', 'true')
+    self.FindElement([[By.ID, 'root']], wait_long=False)
+    self.ExpectAttributeEqual([[By.ID, 'realApp']], 'signed-in', 'true', wait_long=True)
 
   def FindElement(self, path, wait_long=False, should_exist=True, check_visible=True):
     return self.drivers_by_user[self.current_user].FindElement(path, wait_long=wait_long, should_exist=should_exist, check_visible=check_visible)
@@ -228,8 +228,8 @@ class RemoteDriver:
   def SendKeys(self, path, keys):
     self.drivers_by_user[self.current_user].SendKeys(path, keys)
 
-  def ExpectAttributeEqual(self, path, attribute_name, value):
-    self.drivers_by_user[self.current_user].ExpectAttributeEqual(path, attribute_name, value)
+  def ExpectAttributeEqual(self, path, attribute_name, value, wait_long=False):
+    self.drivers_by_user[self.current_user].ExpectAttributeEqual(path, attribute_name, value, wait_long)
 
   def Backspace(self, path, number):
     self.drivers_by_user[self.current_user].Backspace(path, number)
@@ -265,7 +265,7 @@ class FakeDriver:
     retrying_driver = RetryingDriver(simple_driver)
     self.inner_driver = retrying_driver
 
-    self.FindElement([[By.ID, 'root']], wait_long=True, scoped=False)
+    self.FindElement([[By.ID, 'root']], wait_long=False, scoped=False)
 
     self.current_user = user
 
@@ -316,7 +316,7 @@ class FakeDriver:
     else:
       self.inner_driver.ExpectContains(path, needle, should_exist=should_exist, check_visible=check_visible)
 
-  def ExpectAttributeEqual(self, path, attribute_name, value, scoped=True):
+  def ExpectAttributeEqual(self, path, attribute_name, value, scoped=True, wait_long=False):
     if scoped:
       self.inner_driver.ExpectAttributeEqual([[By.ID, self.current_user + "App"]] + path, attribute_name, value)
     else:
@@ -336,7 +336,7 @@ class WholeDriver:
       self.inner_driver = FakeDriver(client_url, is_mobile, populate, user, page)
 
   def WaitForGameLoaded(self):
-    self.FindElement([[By.NAME, "gameLoaded"]], wait_long=True, check_visible=False)
+    self.FindElement([[By.NAME, "gameLoaded"]], wait_long=False, check_visible=False)
 
   def GetGameId(self):
     return self.inner_driver.GetGameId()
@@ -377,8 +377,8 @@ class WholeDriver:
   def ExpectContains(self, path, needle, should_exist=True, check_visible=True, scoped=True):
     return self.inner_driver.ExpectContains(path, needle, should_exist=should_exist, check_visible=check_visible, scoped=scoped)
 
-  def ExpectAttributeEqual(self, path, attribute_name, value):
-    return self.inner_driver.ExpectAttributeEqual(path, attribute_name, value)
+  def ExpectAttributeEqual(self, path, attribute_name, value, wait_long=False):
+    return self.inner_driver.ExpectAttributeEqual(path, attribute_name, value, wait_long)
 
   def RetryUntil(self, action, result, num_times=4):
     for i in range(num_times):
@@ -404,4 +404,3 @@ class WholeDriver:
       lambda: self.Click(pathToRow + [[By.ID, 'menu']]),
       lambda: self.FindElement(pathToRow + [[By.NAME, 'menu-item-%s' % buttonName]]))
     self.Click(pathToRow + [[By.NAME, 'menu-item-%s' % buttonName]])
-

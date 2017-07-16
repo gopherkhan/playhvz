@@ -27,6 +27,7 @@
         isAdmin: Boolean,
         database: Object,
         userId: String,
+        email: String,
         game: Object,
         player: Object,
         path: Array,
@@ -42,6 +43,7 @@
       listeners: {
         'ghvz-open-drawer': 'openDrawer_',
         'ghvz-close-drawer': 'closeDrawer_',
+        'ghvz-open-dialog': 'openDialog_',
       },
 
       computeInnerPath_(path) {
@@ -66,6 +68,13 @@
         this.$$("#drawer").closeDrawer();
       },
 
+      openDialog_(e) {
+        // Move the dialog so it covers the whole screen
+        if (event.detail.dialog) {
+          this.appendChild(event.detail.dialog);
+          event.detail.dialog.openForCreate();
+        }
+      },
     });
   });
 </script>
@@ -124,6 +133,7 @@
               is-admin="[[isAdmin]]"
               database="[[database]]"
               user-id="[[userId]]"
+              email="[[email]]"
               game="[[game]]"
               player="[[player]]"
               player-id="[[playerId]]"
@@ -135,6 +145,7 @@
               bridge="[[bridge]]"
               is-admin="[[isAdmin]]"
               database="[[database]]"
+              email="[[email]]"
               user-id="[[userId]]"
               game="[[game]]"
               player="[[player]]"

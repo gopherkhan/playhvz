@@ -17,6 +17,7 @@
 """TODO: High-level file comment."""
 
 import sys
+import copy
 
 
 def main(argv):
@@ -51,8 +52,10 @@ def enqueue_patch(firebase, data):
   patch_mutex.acquire()
   enqueued_patch.patch('/', data)
   patch_mutex.release()
-  if accessor_mutex.acquire(False):
-    compact_and_send(firebase)
+  print "getting accessor_mutex:", str(accessor_mutex)
+  accessor_mutex.acquire()
+  deferred.defer(compact_and_send, firebase=firebase, _queue="send-firebase-requests")
+  accessor_mutex.release()
 
 def compact_and_send(firebase):
   """
@@ -75,8 +78,11 @@ def finished_patch(firebase, res):
   Send the next patch. If not, clear the lock, allowing accessors to firebase.
   """
   if not enqueued_patch.has_mutations():
+    accessor_mutex.acquire()
+    print "releasing accessor_mutex:", str(accessor_mutex)
     accessor_mutex.release()
   else:
+    print "continuing mutex"
     compact_and_send(firebase)
 
 
@@ -106,9 +112,29 @@ class InMemoryStore:
       self.instance = firebase.get('/', None) or {}
       self.firebase = firebase
 
+  def strippedDatabaseContents(self, contents):
+    contents = copy.deepcopy(contents)
+    if 'chatRooms' in contents:
+      for chat_room_id, chat_room in contents['chatRooms'].iteritems():
+        if 'messages' in chat_room:
+          del chat_room['messages']
+    if 'privatePlayers' in contents:
+      for private_player_id, private_player in contents['privatePlayers'].iteritems():
+        if 'chatRoomMemberships' in private_player:
+          for chat_room_id, chat_room_membership in private_player['chatRoomMemberships'].iteritems():
+            if 'lastSeenTime' in chat_room_membership:
+              del chat_room_membership['lastSeenTime']
+    return contents
+
+  def databaseContentsEqual(self, contentsA, contentsB):
+    contentsA = self.strippedDatabaseContents(contentsA)
+    contentsB = self.strippedDatabaseContents(contentsB)
+    return contentsA == contentsB
+
   def setToNewInstance(self, other_instance):
     old_instance = self.instance
-    has_diff = old_instance != other_instance
+    has_diff = not self.databaseContentsEqual(old_instance, other_instance)
+
     self.instance = other_instance
     # If there is a difference, firebase is out of sync.
     # Clear pending mutations
@@ -134,8 +160,10 @@ class InMemoryStore:
           if false, gets the data from the remote copy.
     """
     if not local_instance:
+      print "getting accessor_mutex"
       accessor_mutex.acquire()
       data = self.firebase.get(path, id)
+      print "releasing accessor_mutex"
       accessor_mutex.release()
       return data
     full_path = path_utils.join_paths(path, id)

@@ -107,12 +107,12 @@ xpathLeaveButton = getPathToElement(actingPlayerName, 'a', 'chat-drawer-leave')
 driver.FindElement([[By.XPATH, xpathLeaveButton]])
 driver.Click([[By.XPATH, xpathLeaveButton]])
 
-if not driver.is_mobile: # TODO: make leave button work the same way on mobile as it does on web
+#if not driver.is_mobile: # TODO: make leave button work the same way on mobile as it does on web
   # Chat should be hidden, verify chat with admin button is available after leaving admin chat
-  driver.FindElement([[By.NAME, 'create-admin-chat-button']])
+driver.FindElement([[By.NAME, 'create-admin-chat-button']])
 
-  # Reopen admin chat
-  driver.Click([[By.NAME, 'create-admin-chat-button']]) 
+# Reopen admin chat
+driver.Click([[By.NAME, 'create-admin-chat-button']]) 
 
 # Verify original message is still in chat room
 driver.ExpectContains([
@@ -120,5 +120,41 @@ driver.ExpectContains([
   [By.NAME, 'message-%s-Hi im %s, how do i know if im the possessed zombie?' % (chatName, actingPlayerName)], 
   [By.CLASS_NAME, 'message-bubble']], 
   'Hi im %s, how do i know if im the possessed zombie?' % actingPlayerName)
+
+# Player opens drawer and hides chat room
+xpathChatDrawerButton = getPathToElement(actingPlayerName, 'paper-icon-button', 'chat-info-' + chatName)
+driver.Click([[By.XPATH, xpathChatDrawerButton]])  
+xpathChatDrawer = getPathToElement(actingPlayerName, 'div', 'chat-drawer-%s' % chatName)
+driver.FindElement([[By.XPATH, xpathChatDrawer]])  
+xpathLeaveButton = getPathToElement(actingPlayerName, 'a', 'chat-drawer-leave')
+driver.FindElement([[By.XPATH, xpathLeaveButton]])
+driver.Click([[By.XPATH, xpathLeaveButton]])
+
+driver.DontFindElement([
+  [By.NAME, 'chat-card'], 
+  [By.NAME, 'ChatRoom: Zeke & HvZ CDC']])
+
+
+actingPlayer = 'moldavi'
+driver.SwitchUser(actingPlayer)
+
+driver.DrawerMenuClick('mobile-main-page', chatName)
+
+actingPlayerName = playerNames[actingPlayer]
+xpathTextarea = getPathToElement(actingPlayerName, 'textarea', 'input-' + chatName)
+xpathSend = getPathToElement(actingPlayerName, 'paper-button', 'submit-' + chatName)
+driver.FindElement([[By.XPATH, xpathTextarea]]) 
+driver.SendKeys([[By.XPATH, xpathTextarea]], 
+  'Mere player, did you just leave the chat room!?')
+driver.Click([[By.XPATH, xpathSend]])
+
+actingPlayer = 'zeke'
+driver.SwitchUser(actingPlayer)
+
+# broken currently, see task V01
+# driver.DrawerMenuClick('mobile-main-page', chatName)
+# driver.FindElement([
+#   [By.NAME, 'chat-card'], 
+#   [By.NAME, 'ChatRoom: Zeke & HvZ CDC']])
 
 driver.Quit()

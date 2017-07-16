@@ -47,12 +47,13 @@ def generateTest(url, password, files, useRemote, useMobile):
 		"adminplayers",
 		"changeallegiance",
 		"chat",
-		"chatEdgeCases",
 		"chatlocation",
+		"chatownerleaves",
 		"chatpage",
 		"creategame",
 		"deactivate",
 		"declare",
+		"declareregularzombie",
 		"globalchat",
 		"infect",
 		"joingame",
@@ -64,7 +65,9 @@ def generateTest(url, password, files, useRemote, useMobile):
 		"requests",
 		"rewardcategories",
 		"selfinfect",
-		"startgame"
+		"signout",
+		"startgame",
+		"stuntimer",
 	]
 
 	if len(files) > 0:
@@ -112,7 +115,8 @@ def runAll(allTests, maxParallel=3):
 			finished += 1
 		newProcess = printAndRun(test)
 		processes.append(newProcess)
-	return [allTests[i] for i in range(len(allTests)) if not processes[i].communicate()[0] == "done\n"]
+	#print([processes[i].communicate() for i in range(len(allTests))])
+	return [allTests[i] for i in range(len(allTests)) if not "done" in processes[i].communicate()[0]]
 
 
 def runAllSequentially(allTests):
@@ -190,7 +194,7 @@ def main():
 						maxParallel = savedData["maxParallel"]
 					failedTests = runAll(allTests, maxParallel)
 					
-			print("FAILED TESTS:", failedTests)
+			print("%d FAILED TESTS:" % len(failedTests), failedTests)
 			savedData["failedTests"] = failedTests
 	finally:
 		savedData.close()

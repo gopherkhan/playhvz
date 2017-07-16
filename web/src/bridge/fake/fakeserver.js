@@ -303,12 +303,20 @@ class FakeServer {
   }
 
   sendChatMessage(args) {
-    let {chatRoomId, playerId, messageId, message} = args;
+    let {gameId, chatRoomId, playerId, messageId, message} = args;
 
     let game = this.game;
     let player = game.playersById[playerId];
     let chatRoom = game.chatRoomsById[chatRoomId];
     let group = game.groupsById[chatRoom.accessGroupId];
+
+    // Make this chat room visible to everyone, since there's a new message.
+    for (let publicPlayerId of group.players) {
+      let member = game.playersById[publicPlayerId];
+      let chatRoomMembership = player.private.chatRoomMemberships.find(m => m.chatRoomId = chatRoomId);
+      // Change the chat room to visible
+      this.updateChatRoomMembership({gameId: gameId, chatRoomId: chatRoomId, actingPlayerId: publicPlayerId, isVisible: true});
+    }
 
     if (group.playersById[player.id]) {
       this.writer.insert(
@@ -320,32 +328,6 @@ class FakeServer {
           })));
     } else {
       throw 'Can\'t send message to chat room without membership';
-    }
-    
-    let [strippedMessage, notificationPlayerIds, ackRequestPlayerIds, textRequestPlayerIds] =
-        this.getMessageTargets(message, group, playerId);
-
-    if (notificationPlayerIds.length) {
-      for (let receiverPlayerId of notificationPlayerIds) {
-        let receiverPlayer = this.game.playersById[receiverPlayerId];
-        let messageForNotification = player.name + ": " + strippedMessage;
-        this.addNotification({
-          playerId: receiverPlayerId,
-          notificationId: this.idGenerator.newNotificationId(),
-          queuedNotificationId: null,
-          message: messageForNotification,
-          previewMessage: messageForNotification,
-          destination: 'chat/' + chatRoom.id,
-          time: this.getTime_(args),
-          icon: null,
-        });
-      }
-    }
-    if (ackRequestPlayerIds.length) {
-      this.sendRequests(chatRoomId, playerId, 'ack', strippedMessage, ackRequestPlayerIds);
-    }
-    if (textRequestPlayerIds.length) {
-      this.sendRequests(chatRoomId, playerId, 'text', strippedMessage, textRequestPlayerIds);
     }
   }
 
@@ -493,10 +475,7 @@ class FakeServer {
       this.writer.set(rewardCategoryPath.concat([argName]), args[argName]);
     }
   }
-  updateNotification(args) {
-    this.updateQueuedNotification(args);
-  }
-  sendNotification(args) {
+  queueNotification(args) {
     this.addQueuedNotification(args);
     let millisecondsUntilSend = args.sendTime - this.getTime_(args);
     if (millisecondsUntilSend > 0) {
@@ -522,7 +501,8 @@ class FakeServer {
           playerIds = new Set(group.players);
         }
         for (let playerId of playerIds) {
-          this.addNotification({
+          this.sendNotification({
+            gameId: queuedNotification.gameId,
             playerId: playerId,
             notificationId: this.idGenerator.newNotificationId(),
             queuedNotificationId: queuedNotification.id,
@@ -531,12 +511,17 @@ class FakeServer {
             destination: queuedNotification.destination,
             time: this.getTime_(args),
             icon: queuedNotification.icon,
+            site: queuedNotification.site,
+            mobile: queuedNotification.mobile,
+            vibrate: queuedNotification.vibrate,
+            sound: queuedNotification.sound,
+            email: queuedNotification.email,
           });
         }
       }
     }
   }
-  addQueuedNotification(args) {
+  queueNotification(args) {
     let {queuedNotificationId} = args;
     args.sent = false;
     this.writer.insert(
@@ -544,7 +529,7 @@ class FakeServer {
         null,
         new Model.QueuedNotification(queuedNotificationId, args));
   }
-  addNotification(args) {
+  sendNotification(args) {
     let {queuedNotificationId, notificationId, playerId} = args;
     let properties = Utils.copyOf(args);
     properties.seenTime = null;
@@ -562,7 +547,7 @@ class FakeServer {
       this.writer.set(queuedNotificationPath.concat([argName]), args[argName]);
     }
   }
-  markNotificationSeen(args) {
+  updateNotification(args) {
     let {playerId, notificationId} = args;
     this.writer.set(
         this.reader.getNotificationPath(playerId, notificationId).concat(["seenTime"]),
@@ -663,8 +648,8 @@ class FakeServer {
     let player = this.reader.get(this.reader.getPublicPlayerPath(playerId));
     assert(player.allegiance == 'undeclared');
 
-    this.addLife(args);
     this.setPlayerAllegiance(playerId, "resistance", false);
+    this.addLife(args);
   }
   joinHorde(args) {
     let {playerId} = args;
@@ -749,6 +734,12 @@ class FakeServer {
     let {infectionId, infectorPlayerId, victimLifeCode, victimPlayerId} = request;
     let victimPlayer = this.findPlayerByIdOrLifeCode_(victimPlayerId, victimLifeCode);
     victimPlayerId = victimPlayer.id;
+
+    if (victimPlayer.allegiance == 'undeclared')
+      throw 'Cannot infect someone that is undeclared!';
+
+    if (victimLifeCode)
+      victimLifeCode = victimLifeCode.trim().replace(/\s+/g, "-").toLowerCase();
 
     // Admin infection
     if (infectorPlayerId == null) {
@@ -848,6 +839,9 @@ class FakeServer {
     let player = this.reader.get(playerPath);
     let time = this.getTime_(request);
     lifeCode = lifeCode || "codefor-" + player.name;
+
+    if (player.allegiance == 'undeclared')
+      throw 'Cannot add life to someone that is undeclared!';
 
     let latestTime = 0;
     assert(player.lives);

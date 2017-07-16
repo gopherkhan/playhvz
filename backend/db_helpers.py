@@ -50,6 +50,7 @@ def ExpectExistence(game_state, path, id, test_property, should_exist):
   if exists and not should_exist:
     raise InvalidInputError('ID "%s" should not have existed!' % id)
   if not exists and should_exist:
+    print "game_state:", str(game_state.transaction.local_patch.data_tree)
     raise InvalidInputError('ID "%s" should have existed!' % id)
 
 
@@ -212,7 +213,7 @@ def RewardCodeToRewardCategoryId(game_state, game_id, reward_code, expect=True):
       if reward_category['shortName'] == reward_category_short_name:
         return reward_category_id
   if expect:
-    raise InvalidInputError('No reward category for shortName %s' % reward_category_short_name)
+    raise InvalidInputError('No reward with that code exists! %s' % reward_code)
   return None
 
 
@@ -230,7 +231,7 @@ def RewardCodeToRewardId(game_state, game_id, reward_code, expect=True):
       if reward['code'] == reward_code:
         return reward_id
   if expect:
-    raise InvalidInputError('No reward for code %s' % reward_code)
+    raise InvalidInputError('No reward with that code exists! %s' % reward_code)
   return None
 
 def GetNextPlayerNumber(game_state, game_id):
@@ -401,24 +402,6 @@ def GetTime(request):
   if 'requestTimeOffset' in request:
     current_time = current_time + request['requestTimeOffset']
   return current_time
-
-def QueueNotification(game_state, request):
-  game_id = request['gameId']
-  put_data = {
-    'sent': False,
-  }
-  properties = ['message', 'site', 'email', 'mobile', 'vibrate', 'sound', 'destination', 'sendTime',
-                'groupId', 'playerId', 'icon', 'previewMessage', 'gameId']
-
-  for property in properties:
-    if property in request and request[property] is not None:
-      put_data[property] = request[property]
-
-  print 'request were putting:'
-  print put_data
-
-  game_state.put('/games/%s/queuedNotifications' % game_id, request['queuedNotificationId'], True)
-  game_state.put('/queuedNotifications', request['queuedNotificationId'], put_data)
 
 
 # vim:ts=2:sw=2:expandtab
